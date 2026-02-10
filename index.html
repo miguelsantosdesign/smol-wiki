@@ -4,33 +4,37 @@
     <title>Smol Wiki</title>
     <script>
 async function loadWiki() {
-    const CACHE_KEY = 'smol-wiki-index';
-    const CACHE_TIME = 5 * 60 * 1000; // 5 minutes
-    
-    // Check cache first
-    const cached = localStorage.getItem(CACHE_KEY);
-    if (cached) {
-        const { data, timestamp } = JSON.parse(cached);
-        if (Date.now() - timestamp < CACHE_TIME) {
-            document.getElementById('wiki-list').innerHTML = data;
-            return;
-        }
-    }
-    
     try {
         const response = await fetch(
             'https://api.github.com/repos/miguelsantosdesign/smol-wiki/contents/wiki?ref=main'
         );
-        const files = await response.json();
-        let html = '';
         
-        for (const file of files.filter(f => f.name.endsWith('.html'))) {
+        if (!response.ok) {
+            throw new Error(`API error: ${response.status}`);
+        }
+        
+        const files = await response.json();
+        const list = document.getElementById('wiki-list');
+        
+        if (!Array.isArray(files)) {
+            list.innerHTML = '<li>No wiki folder found</li>';
+            return;
+        }
+        
+        const htmlFiles = files.filter(f => f.name.endsWith('.html'));
+        
+        if (htmlFiles.length === 0) {
+            list.innerHTML = '<li>No HTML files found in wiki/ folder</li>';
+            return;
+        }
+        
+        for (const file of htmlFiles) {
             const title = file.name
                 .replace('.html', '')
                 .replace(/-/g, ' ')
                 .replace(/\b\w/g, l => l.toUpperCase());
             
-            html += `
+            list.innerHTML += `
                 <li>
                     <a href="wiki/${file.name}">
                         ${title}
@@ -38,18 +42,9 @@ async function loadWiki() {
                 </li>
             `;
         }
-        
-        document.getElementById('wiki-list').innerHTML = html;
-        
-        // Save to cache
-        localStorage.setItem(CACHE_KEY, JSON.stringify({
-            data: html,
-            timestamp: Date.now()
-        }));
-        
     } catch (error) {
         document.getElementById('wiki-list').innerHTML = 
-            `<li>Error loading wiki. Using cached version if available.</li>`;
+            `<li>Error loading wiki: ${error.message}</li>`;
     }
 }
 loadWiki();
